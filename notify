@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+
+require File.expand_path "../trollop.rb", __FILE__
+require 'active_support/core_ext/numeric/time'
+
+# Aliasing == because it looks ugly
+alias :is :==
+
+SUB_COMMANDS = %w(add view delete)
+NOTIFY_DIR = "#{Dir.home}/.notify"
+NOTIFY_FILE = "#{NOTIFY_DIR}/alarms"
+
+global_opts = Trollop::options do
+  version "notify version 1.0"
+  banner "notify is an easy-to-use CLI app for managing notifications"
+  stop_on SUB_COMMANDS
+end
+
+cmd = ARGV.shift
+cmd_opts = case cmd
+  when "add"
+    Trollop::options do
+      opt :hours,   "Hours from now",   type: Integer, short: "-o"
+      opt :minutes, "Minutes from now", type: Integer, short: "-m"
+      opt :days,    "Days from now",    type: Integer, short: "-d"
+      opt :weeks,   "Weeks from now",   type: Integer, short: "-w"
+      opt :time,    "Exact alarm time",                short: "-t"
+    end
+  when "view"
+    Trollop::options do
+      opt :id,   "Id of the alarm to view", type: Integer, short: "-i"
+      opt :last, "View the last alarm",                    short: "-l"
+      opt :all,  "View all alarms",                        short: "-a"
+    end
+  when "delete"
+    Trollop::options do
+      opt :id,   "Id of the alarm to delete", type: Integer, short: "-i"
+      opt :last, "Delete the last alarm",                    short: "-l"
+      opt :all,  "Delete all alarms",                        short: "-a"
+    end
+  when nil
+    puts "notify is an easy-to-use CLI app for managing notifications"
+    puts "Try -h or --help for more help"
+    puts "To get help on a subcommand try `notify <subcommand> --help'"
+  else
+    Trollop::die "Sorry, #{cmd.inspect} is not a recognized subcommand"
+end
+
+def setup
+  Dir.mkdir NOTIFY_DIR unless File.exist? NOTIFY_DIR
+  File.open NOTIFY_FILE, "w" unless File.exists? NOTIFY_FILE
+end
+
+# Parses a Time string and returns an 'at'-friendly time string
+def parse time
+  
+end
+
+# To be called when no options are specified for a subcommand
+# and there is no default behaviour
+def no_opts_supplied(cmd)
+  puts "To get help for #{cmd}, try `notify #{cmd} -h'" 
+end
+
+def add opts
+  time_opts = opts.reject { |k,v| not [:hours, :minutes, :days, :weeks].include? k }
+  not_nil = time_opts.reject { |k,v| v.nil? }
+  if not_nil.length > 1
+    $stderr.puts "Use only one option!"
+    return
+  elsif not_nil.length.is 0
+    no_opts_supplied "add"
+    return
+  end
+  time_unit = not_nil.keys.first.to_s.chop
+  alarm_time = 1.send(time_unit).from_now
+  at_friendly_time = parse alarm_time
+end
+
+def delete opts
+  
+end
+
+def view opts
+  
+end
+
+# puts cmd_opts
+setup
+send cmd, cmd_opts unless cmd.nil?
