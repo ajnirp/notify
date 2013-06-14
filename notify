@@ -6,6 +6,13 @@ require 'active_support/core_ext/numeric/time'
 # Aliasing == because it looks ugly
 alias :is :==
 
+# Monkeypatching Object for convenience
+class Object
+  def nil_or_empty?
+    self.to_s.empty?
+  end
+end
+
 SUB_COMMANDS = %w(add view delete)
 NOTIFY_DIR = "#{Dir.home}/.notify"
 NOTIFY_FILE = "#{NOTIFY_DIR}/alarms"
@@ -20,11 +27,12 @@ cmd = ARGV.shift
 cmd_opts = case cmd
   when "add"
     Trollop::options do
-      opt :hours,   "Hours from now",   type: Integer, short: "-o"
-      opt :minutes, "Minutes from now", type: Integer, short: "-m"
-      opt :days,    "Days from now",    type: Integer, short: "-d"
-      opt :weeks,   "Weeks from now",   type: Integer, short: "-w"
-      opt :time,    "Exact alarm time",                short: "-t"
+      opt :hours,   "Hours from now",         type: Integer, short: "-o"
+      opt :minutes, "Minutes from now",       type: Integer, short: "-i"
+      opt :days,    "Days from now",          type: Integer, short: "-d"
+      opt :weeks,   "Weeks from now",         type: Integer, short: "-w"
+      opt :time,    "Exact alarm time",                      short: "-t"
+      opt :message, "Optional alarm message", type: String,  short: "-m"
     end
   when "view"
     Trollop::options do
@@ -46,9 +54,19 @@ cmd_opts = case cmd
     Trollop::die "Sorry, #{cmd.inspect} is not a recognized subcommand"
 end
 
+# Create the directory and file to store the alarms, unless it exists
 def setup
   Dir.mkdir NOTIFY_DIR unless File.exist? NOTIFY_DIR
   File.open NOTIFY_FILE, "w" unless File.exists? NOTIFY_FILE
+end
+
+# Writes the given string to the alarms file
+def write_file(alarm_string)
+  setup
+  File.open NOTIFY_FILE, "w" do |file|
+    file.write alarm_string
+    file.write "\n"
+  end
 end
 
 # Parses a Time string and returns an 'at'-friendly time string
@@ -65,6 +83,14 @@ def parse time_object
   hour_minute = hour_minute.join
 
   return month_day + hour_minute
+end
+
+def call_at(alarm_string)
+  time, *message = alarm_string.split
+  message = message.join(' ')
+  `at -t #{time} <<EOF
+notify-send "#{message}"
+EOF`
 end
 
 # To be called when no options are specified for a subcommand
@@ -85,11 +111,18 @@ def add opts
     return
   end
 
-  time_unit = not_nil.keys.first.to_s.chop
-  alarm_time = not_nil.values.first.send(time_unit).from_now
-  at_friendly_time = parse alarm_time
+  key, value = not_nil.first
+
+  time_unit = key.to_s.chop
+  alarm_time = value.send(time_unit).from_now
+  at_friendly_time = parse(alarm_time)
   
-  return at_friendly_time
+  opts[:message] = "Alarm!" if opts[:message].nil_or_empty?
+
+  alarm_string = at_friendly_time + ' ' + opts[:message] 
+  write_file(alarm_time.to_s + ' ' + opts[:message])
+
+  call_at(alarm_string)
 end
 
 def delete opts
@@ -100,6 +133,5 @@ def view opts
   
 end
 
-# puts cmd_opts
 setup
-send cmd, cmd_opts unless cmd.nil?
+send(cmd, cmd_opts) unless cmd.nil?
