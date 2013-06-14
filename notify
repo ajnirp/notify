@@ -52,8 +52,19 @@ def setup
 end
 
 # Parses a Time string and returns an 'at'-friendly time string
-def parse time
-  
+def parse time_object
+  time_string = time_object.to_s
+
+  month_day, hour_minute = time_string.split
+  month_day = month_day.split '-'
+  month_day.shift
+  month_day = month_day.join
+
+  hour_minute = hour_minute.split ':'
+  hour_minute.pop
+  hour_minute = hour_minute.join
+
+  return month_day + hour_minute
 end
 
 # To be called when no options are specified for a subcommand
@@ -65,6 +76,7 @@ end
 def add opts
   time_opts = opts.reject { |k,v| not [:hours, :minutes, :days, :weeks].include? k }
   not_nil = time_opts.reject { |k,v| v.nil? }
+
   if not_nil.length > 1
     $stderr.puts "Use only one option!"
     return
@@ -72,9 +84,12 @@ def add opts
     no_opts_supplied "add"
     return
   end
+
   time_unit = not_nil.keys.first.to_s.chop
-  alarm_time = 1.send(time_unit).from_now
+  alarm_time = not_nil.values.first.send(time_unit).from_now
   at_friendly_time = parse alarm_time
+  
+  return at_friendly_time
 end
 
 def delete opts
